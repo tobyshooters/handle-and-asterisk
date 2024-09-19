@@ -29,7 +29,7 @@ def generate_dummy_text(device):
 
 
 def generate_dummy_image(preprocess, device):
-    dummy_image_path = "frank-kafka.jpg"
+    dummy_image_path = "handle-and-asterisk.jpg"
     return preprocess(Image.open(dummy_image_path)).unsqueeze(0).to(device)
 
 
