@@ -1,9 +1,7 @@
 import os
-from typing import List, Union, Iterable, Iterator, TypeVar, Optional
 
 import numpy as np
 import onnxruntime as ort
-from PIL import Image
 
 from image import Preprocessor
 from tokenizer import Tokenizer
@@ -18,40 +16,22 @@ def softmax(x: np.ndarray) -> np.ndarray:
     return exp_arr / np.sum(exp_arr, axis=1, keepdims=True)
 
 
-def cosine_similarity(
-    embeddings_1: np.ndarray, embeddings_2: np.ndarray
-) -> np.ndarray:
+def cosine_similarity(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     """
     Compute the pairwise cosine similarities between two embedding arrays.
     """
-    def normalize(embeddings):
-        return embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
+    def normalize(x):
+        return x / np.linalg.norm(x, axis=1, keepdims=True)
 
-    embeddings_1 = normalize(embeddings_1)
-    embeddings_2 = normalize(embeddings_2)
-
-    return embeddings_1 @ embeddings_2.T
+    return normalize(x) @ normalize(y).T
 
 
 class Clip:
     """
     CLIP inference using ONNX, without torch or torchvision.
     """
-    def __init__(
-        self, model: str = "ViT-B/32", batch_size: Optional[int] = None
-    ):
-        """
-        Instantiates the model and required encoding classes.
+    def __init__(self, model="ViT-B/32", batch_size=None):
 
-        Args:
-            model: The model to utilise. Currently ViT-B/32 and RN50 are
-                allowed.
-            batch_size: If set, splits the lists in `embed_images`
-                and `embed_texts` into batches of this size before
-                passing them to the model. The embeddings are then concatenated
-                back together before being returned. This is necessary when
-                passing large amounts of data (perhaps ~100 or more).
-        """
         allowed_models = ["ViT-B/32", "RN50"]
         if model not in allowed_models:
             raise ValueError(f"`model` must be in {allowed_models}")
@@ -81,11 +61,13 @@ class Clip:
         self._tokenizer = Tokenizer()
         self.text_model = ort.InferenceSession(text_path, providers=ps)
 
-    def embed_images(
-        self,
-        images: Iterable[Union[Image.Image, np.ndarray]],
-        with_batching: bool = True,
-    ) -> np.ndarray:
+    def embed_image(self, image):
+        return self.embed_images([image], with_batching=False)
+
+    def embed_text(self, text):
+        return self.embed_texts([text], with_batching=False)
+
+    def embed_images(self, images, with_batching=True) -> np.ndarray:
         """
         Compute the embeddings for a list of images.
         > images: A list of images to run on.
@@ -94,16 +76,13 @@ class Clip:
 
         Returns an array of embeddings of shape (len(images), embedding_size).
         """
+        if not images:
+            return self._get_empty_embedding()
+
         if not with_batching or self._batch_size is None:
             # Preprocess images
-            images = [
-                self._preprocessor.encode_image(image) for image in images
-            ]
-            if not images:
-                return self._get_empty_embedding()
-
+            images = [self._preprocessor.encode_image(im) for im in images]
             batch = np.concatenate(images)
-
             return self.image_model.run(None, {"IMAGE": batch})[0]
 
         else:
@@ -118,9 +97,7 @@ class Clip:
 
             return np.concatenate(embeddings)
 
-    def embed_texts(
-        self, texts: Iterable[str], with_batching: bool = True
-    ) -> np.ndarray:
+    def embed_texts(self, texts, with_batching=True) -> np.ndarray:
         """
         Compute the embeddings for a list of texts.
         > texts: list of texts to run on. Each is at most 77 characters.
@@ -133,6 +110,7 @@ class Clip:
                 return self._get_empty_embedding()
 
             return self.text_model.run(None, {"TEXT": text})[0]
+
         else:
             embeddings = []
             for batch in to_batches(texts, self._batch_size):
@@ -149,13 +127,10 @@ class Clip:
         return np.empty((0, self.embedding_size), dtype=np.float32)
 
 
-T = TypeVar("T")
-
-
-def to_batches(items: Iterable[T], size: int) -> Iterator[List[T]]:
+def to_batches(items, size):
     """
-    Splits an iterable (e.g. a list) into batches of length `size`. Includes
-    the last, potentially shorter batch.
+    Splits an iterable (e.g. a list) into batches of length `size`.
+    Includes the last, potentially shorter batch.
     """
     if size < 1:
         raise ValueError("Chunk size must be positive.")
@@ -168,6 +143,5 @@ def to_batches(items: Iterable[T], size: int) -> Iterator[List[T]]:
             yield batch
             batch = []
 
-    # The last, potentially incomplete batch
     if batch:
         yield batch
