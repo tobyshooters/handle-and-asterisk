@@ -5,8 +5,8 @@ import numpy as np
 import onnxruntime as ort
 from PIL import Image
 
-from clip.preprocessor import Preprocessor
-from clip.tokenizer import Tokenizer
+from image import Preprocessor
+from tokenizer import Tokenizer
 
 
 def softmax(x: np.ndarray) -> np.ndarray:
@@ -33,7 +33,7 @@ def cosine_similarity(
     return embeddings_1 @ embeddings_2.T
 
 
-class OnnxClip:
+class Clip:
     """
     CLIP inference using ONNX, without torch or torchvision.
     """

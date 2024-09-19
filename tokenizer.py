@@ -1,45 +1,25 @@
 import gzip
 import html
-import os
-from typing import Dict, List, Set, Union, Iterable
+from typing import Dict, List, Set
 
 import ftfy
 import numpy as np
 import regex as re
 
+# Taken from CLIP.
+# https://github.com/openai/CLIP/blob/main/clip/simple_tokenizer.py
 
-def default_bpe():
-    """
-    Taken from CLIP.
-    https://github.com/openai/CLIP/blob/main/clip/simple_tokenizer.py#L10
-    BPE is the byte pair encoding that is used within the tokenizer. More can be read here:
-    https://huggingface.co/course/chapter6/5?fw=pt
-    Returns:
-        the vocabulary byte-pair encodings
-
-    """
-    return os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "bpe_simple_vocab_16e6.txt.gz",
-    )
+PATH = "./bpe_simple_vocab_16e6.txt.gz"
 
 
 def bytes_to_unicode() -> Dict[int, str]:
     """
-    Taken from CLIP.
-    https://github.com/openai/CLIP/blob/main/clip/simple_tokenizer.py#L16
     Returns list of utf-8 byte and a corresponding list of unicode strings.
-    The reversible bpe codes work on unicode strings.
-    This means you need a large # of unicode characters in your vocab if you want to avoid UNKs.
-    When you're at something like a 10B token dataset you end up needing around 5K for decent coverage.
-    This is a signficant percentage of your normal, say, 32K bpe vocab.
-    To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
-    And avoids mapping to whitespace/control characters the bpe code barfs on.
     """
     bs = (
-        list(range(ord("!"), ord("~") + 1))
-        + list(range(ord("¡"), ord("¬") + 1))
-        + list(range(ord("®"), ord("ÿ") + 1))
+        list(range(ord("!"), ord("~") + 1)) +
+        list(range(ord("¡"), ord("¬") + 1)) +
+        list(range(ord("®"), ord("ÿ") + 1))
     )
     cs = bs[:]
     n = 0
@@ -54,8 +34,6 @@ def bytes_to_unicode() -> Dict[int, str]:
 
 def get_pairs(word) -> Set[str]:
     """
-    Taken from CLIP.
-    https://github.com/openai/CLIP/blob/main/clip/simple_tokenizer.py#L38
     Return set of symbol pairs in a word.
     Word is represented as tuple of symbols (symbols being variable-length strings).
     """
@@ -68,42 +46,32 @@ def get_pairs(word) -> Set[str]:
 
 
 def basic_clean(text) -> str:
-    """
-    Taken from CLIP.
-    https://github.com/openai/CLIP/blob/main/clip/simple_tokenizer.py#L50
-    """
     text = ftfy.fix_text(text)
     text = html.unescape(html.unescape(text))
     return text.strip()
 
 
 def whitespace_clean(text) -> str:
-    """
-    Taken from CLIP.
-    https://github.com/openai/CLIP/blob/main/clip/simple_tokenizer.py#L56
-    """
     text = re.sub(r"\s+", " ", text)
     text = text.strip()
     return text
 
 
 class Tokenizer(object):
-    """
-    Taken from CLIP.
-    https://github.com/openai/CLIP/blob/main/clip/simple_tokenizer.py#L62
-    """
-
-    def __init__(self, bpe_path: str = default_bpe()):
+    def __init__(self, bpe_path=PATH):
         self.byte_encoder = bytes_to_unicode()
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
+
         merges = gzip.open(bpe_path).read().decode("utf-8").split("\n")
-        merges = merges[1 : 49152 - 256 - 2 + 1]
+        merges = merges[1: 49152 - 256 - 2 + 1]
         merges = [tuple(merge.split()) for merge in merges]
+
         vocab = list(bytes_to_unicode().values())
         vocab = vocab + [v + "</w>" for v in vocab]
         for merge in merges:
             vocab.append("".join(merge))
         vocab.extend(["<|startoftext|>", "<|endoftext|>"])
+
         self.encoder = dict(zip(vocab, range(len(vocab))))
         self.decoder = {v: k for k, v in self.encoder.items()}
         self.bpe_ranks = dict(zip(merges, range(len(merges))))
@@ -176,29 +144,11 @@ class Tokenizer(object):
         )
         return text
 
-    def encode_text(
-        self,
-        texts: Union[str, Iterable[str]],
-        context_length: int = 77,
-        truncate: bool = False,
-    ) -> np.array:
+    def encode_text(self, texts, context_length=77, truncate=False):
         """
-        Taken from CLIP and reformatted to replace pytorch zeros with numpy zeros.
-        Furthermore, this has been wrapped inside the Tokenizer class instead of being
-        a separate function.
-        https://github.com/openai/CLIP/blob/main/clip/clip.py#L197
         Returns the tokenized representation of given input string(s)
-        Parameters
-        ----------
-        texts : Union[str, List[str]]
-            An input string or a list of input strings to tokenize
-        context_length : int
-            The context length to use; all CLIP models use 77 as the context length
-        truncate: bool
-            Whether to truncate the text in case its encoding is longer than the context length
-        Returns
-        -------
-        A two-dimensional tensor containing the resulting tokens, shape = [number of input strings, context_length].
+        Return two-dimensional tensor containing the resulting tokens,
+               shape = [number of input strings, context_length].
         """
         if isinstance(texts, str):
             texts = [texts]
@@ -215,7 +165,7 @@ class Tokenizer(object):
                     tokens[-1] = eot_token
                 else:
                     raise RuntimeError(
-                        f"Input {texts[i]} is too long for context length {context_length}"
+                        f"{texts[i]} is too long for context {context_length}"
                     )
             result[i, : len(tokens)] = np.array(tokens)
 

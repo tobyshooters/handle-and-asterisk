@@ -54,7 +54,7 @@ class Preprocessor:
         y_from = (resized_h - target_size) // 2
         x_from = (resized_w - target_size) // 2
         img = img[
-            y_from : y_from + target_size, x_from : x_from + target_size, :
+            y_from: y_from + target_size, x_from: x_from + target_size, :
         ]
 
         return img
@@ -120,6 +120,7 @@ class Preprocessor:
                     f"in [0, 1], but the maximum value is {np.max(img)}"
                 )
             img = img.astype(np.float32)
+
         elif np.issubdtype(img.dtype, np.integer):
             if np.max(img) > 255:
                 raise ValueError(
@@ -128,13 +129,14 @@ class Preprocessor:
                 )
             img = img.astype(np.float32) / 255
             img = np.clip(img, 0, 1)  # In case of rounding errors
+
         else:
             raise ValueError(
                 f"The image has an unsupported dtype: {img.dtype}."
             )
 
         if np.isnan(img).any():
-            raise ValueError(f"The image contains NaN values.")
+            raise ValueError("The image contains NaN values.")
 
         try:
             # These should never trigger, but let's do a sanity check
