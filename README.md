@@ -3,7 +3,11 @@
 ```
 from model import Clip
 m = Clip()
-m.embed_text("a handle and an asterisk are just three asterisks")
+m.embed_texts(["a handle and an asterisk are just three asterisks"])
+
+from PIL import Image
+im = Image.open("handle-and-asterisk.jpg")
+m.embed_images([im])
 ```
 
 download weights:
