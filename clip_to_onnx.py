@@ -1,19 +1,13 @@
 """
 Load and save the CLIP model in ONNX format such that pytorch is not required.
 """
-import os
-
 import clip
 import torch
 from PIL import Image
 
-DATA_DIR = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "onnx_clip/data/",
-)
 
-CLIP_IMAGE_ONNX_EXPORT_PATH = "clip_image_model_vitb32.onnx"
-CLIP_TEXT_ONNX_EXPORT_PATH = "clip_text_model_vitb32.onnx"
+CLIP_IMAGE_ONNX_EXPORT_PATH = "./clip_image_model_vitb32.onnx"
+CLIP_TEXT_ONNX_EXPORT_PATH = "./clip_text_model_vitb32.onnx"
 
 
 def generate_dummy_text(device):
@@ -52,7 +46,7 @@ def generate_dummy_image(preprocess, device):
         This image can be anything, it just needs to be in a format that can be fed to the model, like the text.
 
     """
-    dummy_image_path = os.path.join(DATA_DIR, "franz-kafka.jpg")
+    dummy_image_path = "frank-kafka.jpg"
     return preprocess(Image.open(dummy_image_path)).unsqueeze(0).to(device)
 
 
@@ -76,7 +70,6 @@ def export_onnx(
         dynamic_axes: names of the inputs and batches.
 
     """
-    export_path = os.path.join(DATA_DIR, export_path)
     torch.onnx.export(
         model=model,
         args=inputs,
